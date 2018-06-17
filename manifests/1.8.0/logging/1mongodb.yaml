@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: graylog-mongodb
+  labels:
+    k8s-app: graylog-mongodb
+  namespace: logging
+spec:
+  ports:
+  - port: 27017
+    targetPort: 27017
+  clusterIP: None
+  selector:
+    k8s-app: graylog-mongodb
+---
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: graylog-mongodb
+  labels:
+    k8s-app: graylog-mongodb
+  namespace: logging
+spec:
+  serviceName: graylog-mongodb
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        k8s-app: graylog-mongodb
+      namespace: logging
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: mongo
+        image: mongo
+        command:
+        - mongod
+        - "--replSet"
+        - rs0
+        - "--smallfiles"
+        - "--noprealloc"
+        ports:
+        - containerPort: 27017
+        volumeMounts:
+        - name: graylog-mongodb-data
+          mountPath: /data/db
+      - name: mongo-sidecar
+        image: cvallance/mongo-k8s-sidecar
+        env:
+        - name: MONGO_SIDECAR_POD_LABELS
+          value: "k8s-app=graylog-mongodb"
+        - name: KUBE_NAMESPACE
+          value: logging
+        - name: KUBERNETES_MONGO_SERVICE_NAME
+          value: graylog-mongodb
+  volumeClaimTemplates:
+  - metadata:
+      name: graylog-mongodb-data
+      labels:
+        k8s-app: graylog-mongodb
+      namespace: logging
+    spec:
+      storageClassName: gp2
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 5Gi
