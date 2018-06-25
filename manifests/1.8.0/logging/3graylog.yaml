@@ -1,0 +1,73 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    k8s-app: graylog
+  name: graylog
+  namespace: logging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: graylog
+  template:
+    metadata:
+      labels:
+        k8s-app: graylog
+    spec:
+      containers:
+      - image: graylog/graylog:2.4.5-1
+        name: graylog
+        ports:
+        - containerPort: 9000
+          name: http
+        - containerPort: 12201
+          name: gelf-tcp
+        - containerPort: 12201
+          protocol: UDP
+          name: gelf-udp
+        env:
+        - name: GRAYLOG_WEB_ENDPOINT_URI
+          value: http://minikube.com:80/graylog/api/
+        - name: GRAYLOG_REST_LISTEN_URI
+          value: http://0.0.0.0:9000/graylog/api/
+        - name: GRAYLOG_WEB_LISTEN_URI
+          value: http://0.0.0.0:9000/graylog
+        - name: GRAYLOG_ELASTICSEARCH_HOSTS
+          value: http://graylog-elasticsearch-0.graylog-elasticsearch-0.logging.svc.cluster.local:9200
+        - name:  GRAYLOG_MONGODB_URI
+          value: mongodb://graylog-mongodb-0.graylog-mongodb.logging.svc.cluster.local:27017/graylog
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: graylog
+  namespace: logging
+spec:
+  ports:
+  - name: http
+    port: 9000
+    targetPort: http
+  - name: gelf-udp
+    port: 12201
+    protocol: UDP
+    targetPort: gelf-udp
+  - name: gelf-tcp
+    port: 12201
+    targetPort: gelf-tcp
+  selector:
+    k8s-app: graylog
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: graylog
+  namespace: logging
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /graylog
+        backend:
+          serviceName: graylog
+          servicePort: 9000
